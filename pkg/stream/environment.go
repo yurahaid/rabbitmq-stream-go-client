@@ -515,6 +515,7 @@ func (cc *environmentCoordinator) maybeCleanClients() {
 
 func (c *Client) maybeCleanProducers(streamName string) {
 	c.mutex.Lock()
+	logs.LogError("maybeCleanProducers, mutex locked")
 	for pidx, producer := range c.coordinator.Producers() {
 		if producer.(*Producer).GetStreamName() == streamName {
 			err := c.coordinator.RemoveProducerById(pidx.(uint8), Event{
@@ -524,17 +525,21 @@ func (c *Client) maybeCleanProducers(streamName string) {
 				Reason:     MetaDataUpdate,
 				Err:        nil,
 			})
+
 			if err != nil {
+				logs.LogError("maybeCleanProducers: error, we got deadlock, remove producer %s, leader %s, rpcTimeout %w", streamName, c.connectionProperties.host, c.connectionProperties.port)
 				return
 			}
 		}
 	}
 	c.mutex.Unlock()
+	logs.LogError("maybeCleanProducers, mutex unlocked")
 
 }
 
 func (c *Client) maybeCleanConsumers(streamName string) {
 	c.mutex.Lock()
+	logs.LogError("maybeCleanConsumers, mutex locked")
 	for pidx, consumer := range c.coordinator.consumers {
 		if consumer.(*Consumer).options.streamName == streamName {
 			err := c.coordinator.RemoveConsumerById(pidx.(uint8), Event{
@@ -545,11 +550,13 @@ func (c *Client) maybeCleanConsumers(streamName string) {
 				Err:        nil,
 			})
 			if err != nil {
+				logs.LogError("maybeCleanProducers: error, we got deadlock, remove producer %s, leader %s, rpcTimeout %w", streamName, c.connectionProperties.host, c.connectionProperties.port)
 				return
 			}
 		}
 	}
 	c.mutex.Unlock()
+	logs.LogError("maybeCleanConsumers, mutex unlocked")
 }
 
 func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCPParameters, saslConfiguration *SaslConfiguration, streamName string, options *ProducerOptions, rpcTimeout time.Duration, cleanUp func()) (*Producer, error) {
