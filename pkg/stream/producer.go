@@ -626,7 +626,13 @@ func (producer *Producer) Close() error {
 	})
 }
 func (producer *Producer) close(reason Event) error {
-
+	logs.LogDebug(
+		"close producer %d, reason %s, name %s, stream name %s",
+		producer.id,
+		reason.Reason,
+		reason.Name,
+		reason.StreamName,
+	)
 	if producer.getStatus() == closed {
 		return AlreadyClosed
 	}
@@ -664,10 +670,18 @@ func (producer *Producer) close(reason Event) error {
 	_, _ = producer.options.client.coordinator.ExtractProducerById(producer.id)
 
 	if producer.options.client.coordinator.ProducersCount() == 0 {
+		logs.LogDebug(
+			"close producer: close client - the last producer %d, client properties %w, host %s",
+			producer.id,
+			producer.options.client.clientProperties.items,
+			producer.options.client.broker.hostPort(),
+		)
+
 		_ = producer.options.client.Close()
 	}
 
 	if producer.onClose != nil {
+		logs.LogDebug("close producer: clean up - the last producer %d", producer.id)
 		producer.onClose()
 	}
 

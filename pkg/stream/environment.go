@@ -571,7 +571,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 	}
 
 	if clientResult == nil {
-		logs.LogDebug("newProducer: create new client for producer %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
+		logs.LogDebug("newProducer: create new client for producer %s, leader %s, rpcTimeout ms %w", streamName, leader.hostPort(), rpcTimeout.Milliseconds())
 		clientResult = cc.newClientForProducer(clientProvidedName, leader, tcpParameters, saslConfiguration, rpcTimeout)
 	}
 
@@ -712,15 +712,15 @@ func (ps *producersEnvironment) newProducer(clientLocator *Client, streamName st
 	leader.cloneFrom(clientLocator.broker, resolver)
 
 	cleanUp := func() {
-		logs.LogDebug("newProducer: start clean up producers, %s", coordinatorKey)
+		logs.LogDebug("newProducer: start clean up producers %s, stream name %s", coordinatorKey, streamName)
 		for _, coordinator := range ps.producersCoordinator {
 			coordinator.maybeCleanClients()
 		}
 
-		logs.LogDebug("newProducer: finish clean up producers,  %s", coordinatorKey)
+		logs.LogDebug("newProducer: finish clean up producers %s, stream name %s", coordinatorKey)
 	}
 
-	logs.LogDebug("newProducer: create new producer %s, leader %s, rpcTimeout %w", streamName, leader.hostPort())
+	logs.LogDebug("newProducer: create new producer %s, leader %s, rpcTimeout ms %w", streamName, leader.hostPort(), rpcTimeOut.Milliseconds())
 
 	producer, err := ps.producersCoordinator[coordinatorKey].newProducer(leader, clientLocator.tcpParameters,
 		clientLocator.saslConfiguration, streamName, options, rpcTimeOut, cleanUp)

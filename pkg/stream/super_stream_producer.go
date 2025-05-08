@@ -316,7 +316,7 @@ func (s *SuperStreamProducer) ConnectPartition(partition string) error {
 
 			}
 		}
-		logs.LogDebug("[SuperStreamProducer] chNotifyPublishConfirmation closed - partition: %s", gpartion)
+		logs.LogDebug("[SuperStreamProducer] chNotifyPublishConfirmation closed - partition: %s, producer id %d", gpartion, producer.id)
 	}(partition, chSingleStreamPublishConfirmation)
 
 	return nil

@@ -142,6 +142,7 @@ func (c *Client) connect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if !c.socket.isOpen() {
+		logs.LogDebug("Client connect: socket is closed, connecting to %s", c.broker.GetUri())
 		u, err := url.Parse(c.broker.GetUri())
 		if err != nil {
 			return err
@@ -151,11 +152,14 @@ func (c *Client) connect() error {
 		c.tuneState.requestedHeartbeat = int(c.tcpParameters.RequestedHeartbeat.Seconds())
 
 		servAddr := net.JoinHostPort(host, port)
+		logs.LogDebug("Client connect: resolve tcp addr %s", servAddr)
+
 		tcpAddr, errorResolve := net.ResolveTCPAddr("tcp", servAddr)
 		if errorResolve != nil {
 			logs.LogDebug("Resolve error %s", errorResolve)
 			return errorResolve
 		}
+		logs.LogDebug("Client connect: dial tcp %s", tcpAddr.String())
 		connection, errorConnection := net.DialTCP("tcp", nil, tcpAddr)
 		if errorConnection != nil {
 			logs.LogDebug("%s", errorConnection)
@@ -194,6 +198,7 @@ func (c *Client) connect() error {
 		c.socket.setOpen()
 
 		go c.handleResponse()
+		logs.LogDebug("Client connect: peer properties")
 		serverProperties, err2 := c.peerProperties()
 		c.serverProperties = serverProperties
 		if err2 != nil {
@@ -237,6 +242,8 @@ func (c *Client) connect() error {
 		logs.LogDebug("User %s, connected to: %s, vhost:%s", u.User.Username(),
 			net.JoinHostPort(host, port),
 			vhost)
+	} else {
+		logs.LogDebug("Client connect: socket is opened, skip connecting to %s", c.broker.GetUri())
 	}
 	return nil
 }
