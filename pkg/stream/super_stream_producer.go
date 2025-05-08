@@ -236,9 +236,8 @@ func (s *SuperStreamProducer) init() error {
 // with the ConnectPartition the user can re-connect a partition to the SuperStreamProducer
 // that should be used only in case of disconnection
 func (s *SuperStreamProducer) ConnectPartition(partition string) error {
-	logs.LogDebug("[SuperStreamProducer] ConnectPartition for partition: %s", partition)
-
 	s.mutex.Lock()
+	logs.LogDebug("[SuperStreamProducer] ConnectPartition for partition: %s, active producers %w", partition, s.activeProducersNames())
 	found := false
 	for _, p := range s.partitions {
 		if p == partition {
@@ -247,11 +246,14 @@ func (s *SuperStreamProducer) ConnectPartition(partition string) error {
 		}
 	}
 	if !found {
+		logs.LogDebug("[SuperStreamProducer] Partition not found: %s, active producers %w", partition, s.activeProducersNames())
 		s.mutex.Unlock()
 		return fmt.Errorf("partition %s not found in the super stream %s", partition, s.SuperStream)
 	}
 	for _, producer := range s.activeProducers {
 		if producer.GetStreamName() == partition {
+			logs.LogDebug("[SuperStreamProducer] Partition already connected: %s, active producers %w", partition, s.activeProducersNames())
+
 			s.mutex.Unlock()
 			return fmt.Errorf("producer already connected to: %s partition ", partition)
 		}
@@ -264,14 +266,19 @@ func (s *SuperStreamProducer) ConnectPartition(partition string) error {
 	}
 	options = options.SetFilter(s.SuperStreamProducerOptions.Filter)
 
+	logs.LogDebug("[SuperStreamProducer] Start to create new producer: %s", partition)
+
 	producer, err := s.env.NewProducer(partition, options)
 	if err != nil {
+		logs.LogError("[SuperStreamProducer] Error creating new producer: %s", partition)
 		return err
 	}
+	logs.LogDebug("[SuperStreamProducer] Created new producer: %s", partition)
 	s.mutex.Lock()
 	s.activeProducers = append(s.activeProducers, producer)
 	chSingleStreamPublishConfirmation := producer.NotifyPublishConfirmation()
 	closedEvent := producer.NotifyClose()
+	logs.LogDebug("[SuperStreamProducer] New producer added to active producers: %s, active producers %w", partition, s.activeProducersNames())
 	s.mutex.Unlock()
 
 	go func(gpartion string, _closedEvent <-chan Event) {
@@ -321,6 +328,14 @@ func (s *SuperStreamProducer) NotifyPublishConfirmation(size int) chan Partition
 	ch := make(chan PartitionPublishConfirm, size)
 	s.chNotifyPublishConfirmation = ch
 	return ch
+}
+
+func (s *SuperStreamProducer) activeProducersNames() []string {
+	activeProducers := make([]string, 0, len(s.activeProducers))
+	for _, p := range s.activeProducers {
+		activeProducers = append(activeProducers, fmt.Sprintf("%s, status: %d", p.GetStreamName(), p.getStatus()))
+	}
+	return activeProducers
 }
 
 // NotifyPartitionClose returns a channel that will be notified when a partition is closed

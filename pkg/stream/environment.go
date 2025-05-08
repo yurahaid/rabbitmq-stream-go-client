@@ -129,6 +129,8 @@ func (env *Environment) maybeReconnectLocator() error {
 	env.locator.mutex.Lock()
 	defer env.locator.mutex.Unlock()
 	if env.locator.client != nil && env.locator.client.socket.isOpen() {
+		logs.LogDebug("maybeReconnectLocator already connected, skip")
+
 		return nil
 	}
 
@@ -137,6 +139,7 @@ func (env *Environment) maybeReconnectLocator() error {
 		env.options.SaslConfiguration, env.options.RPCTimeout)
 
 	env.locator.client = c
+	logs.LogDebug("maybeReconnectLocator, connect created client")
 	err := c.connect()
 	tentatives := 1
 	for err != nil {
@@ -182,6 +185,7 @@ func (env *Environment) NewProducer(streamName string, producerOptions *Producer
 	err := env.maybeReconnectLocator()
 
 	if err != nil {
+		logs.LogError("NewProducer error: %s", err)
 		return nil, err
 	}
 
