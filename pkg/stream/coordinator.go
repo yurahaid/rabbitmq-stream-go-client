@@ -16,7 +16,7 @@ type Coordinator struct {
 	responses        map[interface{}]interface{}
 	nextItemProducer uint8
 	nextItemConsumer uint8
-	mutex            *LoggingMutex
+	mutex            *sync.Mutex
 }
 
 type Code struct {
@@ -42,7 +42,7 @@ type Response struct {
 }
 
 func NewCoordinator() *Coordinator {
-	return &Coordinator{mutex: &LoggingMutex{},
+	return &Coordinator{mutex: &sync.Mutex{},
 		producers: make(map[interface{}]interface{}),
 		consumers: make(map[interface{}]interface{}),
 		responses: make(map[interface{}]interface{})}

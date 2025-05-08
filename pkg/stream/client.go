@@ -64,7 +64,7 @@ type Client struct {
 	tcpParameters        *TCPParameters
 	saslConfiguration    *SaslConfiguration
 
-	mutex             *sync.Mutex
+	mutex             *LoggingMutex
 	lastHeartBeat     HeartBeat
 	socketCallTimeout time.Duration
 	availableFeatures *availableFeatures
@@ -88,19 +88,23 @@ func newClient(connectionName string, broker *Broker,
 	}
 
 	c := &Client{
-		coordinator:          NewCoordinator(),
-		broker:               clientBroker,
-		tcpParameters:        tcpParameters,
-		saslConfiguration:    saslConfiguration,
-		destructor:           &sync.Once{},
-		mutex:                &sync.Mutex{},
+		coordinator:       NewCoordinator(),
+		broker:            clientBroker,
+		tcpParameters:     tcpParameters,
+		saslConfiguration: saslConfiguration,
+		destructor:        &sync.Once{},
+		mutex: &LoggingMutex{
+			clientID: fmt.Sprintf("client_%s", clientBroker.hostPort()),
+		},
 		clientProperties:     ClientProperties{items: make(map[string]string)},
 		connectionProperties: ConnectionProperties{},
 		lastHeartBeat: HeartBeat{
 			value: time.Now(),
 		},
 		socket: socket{
-			mutex:      &sync.Mutex{},
+			mutex: &LoggingMutex{
+				clientID: fmt.Sprintf("logging_mutex_%s", clientBroker.hostPort()),
+			},
 			destructor: &sync.Once{},
 		},
 		socketCallTimeout: rpcTimeOut,

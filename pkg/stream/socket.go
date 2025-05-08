@@ -11,7 +11,7 @@ import (
 type socket struct {
 	connection net.Conn
 	writer     *bufio.Writer
-	mutex      *sync.Mutex
+	mutex      *LoggingMutex
 	closed     int32
 	destructor *sync.Once
 }
