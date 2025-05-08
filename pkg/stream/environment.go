@@ -571,9 +571,11 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 	}
 
 	if clientResult == nil {
+		logs.LogDebug("newProducer: create new client for producer %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
 		clientResult = cc.newClientForProducer(clientProvidedName, leader, tcpParameters, saslConfiguration, rpcTimeout)
 	}
 
+	logs.LogDebug("newProducer:client connect %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
 	err := clientResult.connect()
 	if err != nil {
 		return nil, err
@@ -596,6 +598,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 		time.Sleep(1 * time.Second)
 	}
 
+	logs.LogDebug("newProducer: declare publisher %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
 	producer, err := clientResult.declarePublisher(streamName, options, cleanUp)
 
 	if err != nil {
@@ -690,10 +693,13 @@ func (ps *producersEnvironment) newProducer(clientLocator *Client, streamName st
 	options *ProducerOptions, resolver *AddressResolver, rpcTimeOut time.Duration) (*Producer, error) {
 	ps.mutex.Lock()
 	defer ps.mutex.Unlock()
+	logs.LogDebug("newProducer: search leader for stream %s", streamName)
 	leader, err := clientLocator.BrokerLeader(streamName)
 	if err != nil {
 		return nil, err
 	}
+	logs.LogDebug("newProducer: leader found for stream %s, leader %s", streamName, leader.hostPort())
+
 	coordinatorKey := leader.hostPort()
 	if ps.producersCoordinator[coordinatorKey] == nil {
 		ps.producersCoordinator[coordinatorKey] = &environmentCoordinator{
@@ -706,10 +712,16 @@ func (ps *producersEnvironment) newProducer(clientLocator *Client, streamName st
 	leader.cloneFrom(clientLocator.broker, resolver)
 
 	cleanUp := func() {
+		logs.LogDebug("newProducer: start clean up producers, %s", coordinatorKey)
 		for _, coordinator := range ps.producersCoordinator {
 			coordinator.maybeCleanClients()
 		}
+
+		logs.LogDebug("newProducer: finish clean up producers,  %s", coordinatorKey)
 	}
+
+	logs.LogDebug("newProducer: create new producer %s, leader %s, rpcTimeout %w", streamName, leader.hostPort())
+
 	producer, err := ps.producersCoordinator[coordinatorKey].newProducer(leader, clientLocator.tcpParameters,
 		clientLocator.saslConfiguration, streamName, options, rpcTimeOut, cleanUp)
 	if err != nil {
