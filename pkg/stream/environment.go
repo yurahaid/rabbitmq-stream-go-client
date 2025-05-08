@@ -582,7 +582,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 		clientResult = cc.newClientForProducer(clientProvidedName, leader, tcpParameters, saslConfiguration, rpcTimeout)
 	}
 
-	logs.LogDebug("newProducer:client connect %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
+	logs.LogDebug("newProducer:client connect %s, leader %s, rpcTimeout %w, client id %s", streamName, leader.hostPort(), rpcTimeout, clientResult.id)
 	err := clientResult.connect()
 	if err != nil {
 		return nil, err
@@ -605,7 +605,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 		time.Sleep(1 * time.Second)
 	}
 
-	logs.LogDebug("newProducer: declare publisher %s, leader %s, rpcTimeout %w", streamName, leader.hostPort(), rpcTimeout)
+	logs.LogDebug("newProducer: declare publisher %s, leader %s, rpcTimeout %w, client id %s", streamName, leader.hostPort(), rpcTimeout, clientResult.id)
 	producer, err := clientResult.declarePublisher(streamName, options, cleanUp)
 
 	if err != nil {

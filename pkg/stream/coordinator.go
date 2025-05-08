@@ -2,6 +2,7 @@ package stream
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/amqp"
 	"strconv"
@@ -16,7 +17,7 @@ type Coordinator struct {
 	responses        map[interface{}]interface{}
 	nextItemProducer uint8
 	nextItemConsumer uint8
-	mutex            *sync.Mutex
+	mutex            *LoggingMutex
 }
 
 type Code struct {
@@ -41,8 +42,11 @@ type Response struct {
 	correlationid      int
 }
 
-func NewCoordinator() *Coordinator {
-	return &Coordinator{mutex: &sync.Mutex{},
+func NewCoordinator(uuid uuid.UUID) *Coordinator {
+	return &Coordinator{
+		mutex: &LoggingMutex{
+			clientID: fmt.Sprintf("coordinator-%s", uuid.String()),
+		},
 		producers: make(map[interface{}]interface{}),
 		consumers: make(map[interface{}]interface{}),
 		responses: make(map[interface{}]interface{})}

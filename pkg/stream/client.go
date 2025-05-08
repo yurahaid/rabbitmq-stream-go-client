@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/google/uuid"
 	"math/rand"
 	"net"
 	"net/url"
@@ -54,6 +55,7 @@ type HeartBeat struct {
 }
 
 type Client struct {
+	id                   string
 	socket               socket
 	destructor           *sync.Once
 	clientProperties     ClientProperties
@@ -87,14 +89,17 @@ func newClient(connectionName string, broker *Broker,
 		saslConfiguration = newSaslConfigurationDefault()
 	}
 
+	uuid := uuid.New()
+
 	c := &Client{
-		coordinator:       NewCoordinator(),
+		id:                uuid.String(),
+		coordinator:       NewCoordinator(uuid),
 		broker:            clientBroker,
 		tcpParameters:     tcpParameters,
 		saslConfiguration: saslConfiguration,
 		destructor:        &sync.Once{},
 		mutex: &LoggingMutex{
-			clientID: fmt.Sprintf("client_%s", clientBroker.hostPort()),
+			clientID: fmt.Sprintf("client_%s_%s", uuid, clientBroker.hostPort()),
 		},
 		clientProperties:     ClientProperties{items: make(map[string]string)},
 		connectionProperties: ConnectionProperties{},
@@ -103,7 +108,7 @@ func newClient(connectionName string, broker *Broker,
 		},
 		socket: socket{
 			mutex: &LoggingMutex{
-				clientID: fmt.Sprintf("logging_mutex_%s", clientBroker.hostPort()),
+				clientID: fmt.Sprintf("socket_%s_%s", uuid, clientBroker.hostPort()),
 			},
 			destructor: &sync.Once{},
 		},
@@ -146,7 +151,7 @@ func (c *Client) connect() error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	if !c.socket.isOpen() {
-		logs.LogDebug("Client connect: socket is closed, connecting to %s", c.broker.GetUri())
+		logs.LogDebug("Client connect: socket is closed, connecting to %s, client id %s", c.broker.GetUri(), c.id)
 		u, err := url.Parse(c.broker.GetUri())
 		if err != nil {
 			return err
@@ -247,7 +252,7 @@ func (c *Client) connect() error {
 			net.JoinHostPort(host, port),
 			vhost)
 	} else {
-		logs.LogDebug("Client connect: socket is opened, skip connecting to %s", c.broker.GetUri())
+		logs.LogDebug("Client connect: socket is opened, skip connecting to %s, client id %s", c.broker.GetUri(), c.id)
 	}
 	return nil
 }
