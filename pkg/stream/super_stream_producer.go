@@ -5,7 +5,6 @@ import (
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/logs"
 	"github.com/rabbitmq/rabbitmq-stream-go-client/pkg/message"
 	"github.com/spaolacci/murmur3"
-	"sync"
 	"time"
 )
 
@@ -173,7 +172,7 @@ type SuperStreamProducer struct {
 	partitions []string
 
 	env                         *Environment
-	mutex                       sync.Mutex
+	mutex                       *LoggingMutex
 	chNotifyPublishConfirmation chan PartitionPublishConfirm
 	chSuperStreamPartitionClose chan PPartitionClose
 
@@ -207,7 +206,9 @@ func newSuperStreamProducer(env *Environment, superStream string, superStreamPro
 		env:                        env,
 		SuperStream:                superStream,
 		SuperStreamProducerOptions: superStreamProducerOptions,
-		mutex:                      sync.Mutex{},
+		mutex: &LoggingMutex{
+			clientID: "SuperStreamProducer",
+		},
 	}, nil
 }
 
@@ -217,15 +218,19 @@ func (s *SuperStreamProducer) init() error {
 
 	partitions, err := s.env.QueryPartitions(s.SuperStream)
 	s.partitions = partitions
+	logs.LogDebug("[SuperStreamProducer] Partitions found: %v", partitions)
 
 	if err != nil {
 		return err
 	}
 	for _, p := range partitions {
+		logs.LogDebug("[SuperStreamProducer] Start connect to partition: %s", p)
 		err = s.ConnectPartition(p)
 		if err != nil {
 			return err
 		}
+
+		logs.LogDebug("[SuperStreamProducer] Connected to partition: %s", p)
 	}
 	return nil
 }
@@ -264,10 +269,13 @@ func (s *SuperStreamProducer) ConnectPartition(partition string) error {
 	}
 	options = options.SetFilter(s.SuperStreamProducerOptions.Filter)
 
+	logs.LogDebug("[SuperStreamProducer] Create new producer: %s", partition)
+
 	producer, err := s.env.NewProducer(partition, options)
 	if err != nil {
 		return err
 	}
+	logs.LogDebug("[SuperStreamProducer] Producer created: %s", partition)
 	s.mutex.Lock()
 	s.activeProducers = append(s.activeProducers, producer)
 	chSingleStreamPublishConfirmation := producer.NotifyPublishConfirmation()

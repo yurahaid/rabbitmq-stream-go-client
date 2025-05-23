@@ -64,7 +64,7 @@ type Client struct {
 	tcpParameters        *TCPParameters
 	saslConfiguration    *SaslConfiguration
 
-	mutex             *sync.Mutex
+	mutex             *LoggingMutex
 	lastHeartBeat     HeartBeat
 	socketCallTimeout time.Duration
 	availableFeatures *availableFeatures
@@ -93,7 +93,7 @@ func newClient(connectionName string, broker *Broker,
 		tcpParameters:        tcpParameters,
 		saslConfiguration:    saslConfiguration,
 		destructor:           &sync.Once{},
-		mutex:                &sync.Mutex{},
+		mutex:                &LoggingMutex{clientID: "client"},
 		clientProperties:     ClientProperties{items: make(map[string]string)},
 		connectionProperties: ConnectionProperties{},
 		lastHeartBeat: HeartBeat{

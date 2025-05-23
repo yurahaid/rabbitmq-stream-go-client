@@ -16,13 +16,13 @@ import (
 
 type locator struct {
 	client *Client
-	mutex  sync.Mutex
+	mutex  *LoggingMutex
 }
 
 func newLocator(client *Client) *locator {
 	return &locator{
 		client: client,
-		mutex:  sync.Mutex{},
+		mutex:  &LoggingMutex{clientID: "locator"},
 	}
 }
 
@@ -137,6 +137,7 @@ func (env *Environment) maybeReconnectLocator() error {
 		env.options.SaslConfiguration, env.options.RPCTimeout)
 
 	env.locator.client = c
+	logs.LogDebug("Calling client connect in env.maybeReconnectLocator")
 	err := c.connect()
 	tentatives := 1
 	for err != nil {
@@ -155,6 +156,8 @@ func (env *Environment) maybeReconnectLocator() error {
 		err = c1.connect()
 
 	}
+
+	logs.LogDebug("Calling locator client connect in env.maybeReconnectLocator")
 
 	return env.locator.client.connect()
 }
@@ -471,7 +474,7 @@ func (envOptions *EnvironmentOptions) SetRPCTimeout(timeout time.Duration) *Envi
 }
 
 type environmentCoordinator struct {
-	mutex             *sync.Mutex
+	mutex             *LoggingMutex
 	clientsPerContext sync.Map
 	maxItemsForClient int
 	nextId            int
@@ -571,6 +574,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 		clientResult = cc.newClientForProducer(clientProvidedName, leader, tcpParameters, saslConfiguration, rpcTimeout)
 	}
 
+	logs.LogDebug("[environmentCoordinator] clientResult connect")
 	err := clientResult.connect()
 	if err != nil {
 		return nil, err
@@ -593,6 +597,7 @@ func (cc *environmentCoordinator) newProducer(leader *Broker, tcpParameters *TCP
 		time.Sleep(1 * time.Second)
 	}
 
+	logs.LogDebug("[environmentCoordinator] declare publisher for stream %s", streamName)
 	producer, err := clientResult.declarePublisher(streamName, options, cleanUp)
 
 	if err != nil {
@@ -663,14 +668,14 @@ func (cc *environmentCoordinator) getClientsPerContext() map[int]*Client {
 }
 
 type producersEnvironment struct {
-	mutex                *sync.Mutex
+	mutex                *LoggingMutex
 	producersCoordinator map[string]*environmentCoordinator
 	maxItemsForClient    int
 }
 
 func newProducers(maxItemsForClient int) *producersEnvironment {
 	producers := &producersEnvironment{
-		mutex:                &sync.Mutex{},
+		mutex:                &LoggingMutex{clientID: "producerEnv"},
 		producersCoordinator: map[string]*environmentCoordinator{},
 		maxItemsForClient:    maxItemsForClient,
 	}
@@ -681,19 +686,22 @@ func (ps *producersEnvironment) newProducer(clientLocator *Client, streamName st
 	options *ProducerOptions, resolver *AddressResolver, rpcTimeOut time.Duration) (*Producer, error) {
 	ps.mutex.Lock()
 	defer ps.mutex.Unlock()
+	logs.LogDebug("[ProducerEnvironment] clientLocator extract broker leader")
 	leader, err := clientLocator.BrokerLeader(streamName)
 	if err != nil {
+		logs.LogError("[ProducerEnvironment] clientLocator extract broker leader error, %s", err)
 		return nil, err
 	}
 	coordinatorKey := leader.hostPort()
 	if ps.producersCoordinator[coordinatorKey] == nil {
 		ps.producersCoordinator[coordinatorKey] = &environmentCoordinator{
 			clientsPerContext: sync.Map{},
-			mutex:             &sync.Mutex{},
+			mutex:             &LoggingMutex{clientID: "producerEnv"},
 			maxItemsForClient: ps.maxItemsForClient,
 			nextId:            0,
 		}
 	}
+	logs.LogDebug("[ProducerEnvironment] clientLocator clone broker leader")
 	leader.cloneFrom(clientLocator.broker, resolver)
 
 	cleanUp := func() {
@@ -701,6 +709,8 @@ func (ps *producersEnvironment) newProducer(clientLocator *Client, streamName st
 			coordinator.maybeCleanClients()
 		}
 	}
+
+	logs.LogDebug("[ProducerEnvironment] newProducer")
 	producer, err := ps.producersCoordinator[coordinatorKey].newProducer(leader, clientLocator.tcpParameters,
 		clientLocator.saslConfiguration, streamName, options, rpcTimeOut, cleanUp)
 	if err != nil {
@@ -753,7 +763,9 @@ func (ps *consumersEnvironment) NewSubscriber(clientLocator *Client, streamName 
 	if ps.consumersCoordinator[coordinatorKey] == nil {
 		ps.consumersCoordinator[coordinatorKey] = &environmentCoordinator{
 			clientsPerContext: sync.Map{},
-			mutex:             &sync.Mutex{},
+			mutex: &LoggingMutex{
+				clientID: "consumerEnv",
+			},
 			maxItemsForClient: ps.maxItemsForClient,
 			nextId:            0,
 		}
